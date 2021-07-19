@@ -27,15 +27,13 @@ async function setPublicPermissions(newPermissions) {
   const publicRole = await strapi
     .query("role", "users-permissions")
     .findOne({ type: "public" });
-  
-  console.log("query result from role and users-permission", await strapi.query("role", "users-permissions"))
-  console.log("publicRole is", publicRole)
+
   // List all available permissions
   const publicPermissions = await strapi
     .query("permission", "users-permissions")
     .find({
       type: ["users-permissions", "application"],
-      role: publicRole.myId,
+      role: publicRole.id,
     });
 
   // Update permission to match new config
@@ -55,7 +53,7 @@ async function setPublicPermissions(newPermissions) {
       // Enable the selected permissions
       return strapi
         .query("permission", "users-permissions")
-        .update({ id: permission.myId }, { enabled: true })
+        .update({ id: permission.id }, { enabled: true })
     });
   await Promise.all(updatePromises);
 }
@@ -122,14 +120,64 @@ async function importWriters() {
   }));
 }
 
-async function importArticles() {
-  return Promise.all(articles.map((article) => {
-    const files = {
-      image: getFileData(`${article.slug}.jpg`),
+// Randomly set relations on Article to avoid error with MongoDB
+async function getArticleRelation() {
+  const categories = await strapi.query("category").find();
+  const authors = await strapi.query("writer").find();
+  const isMongoose = strapi.config.connections.default.connector == "mongoose";
+
+  if (isMongoose) {
+    return {
+      category: {
+        _id: categories[Math.floor(Math.random() * categories.length)].id,
+      },
+      author: {
+        _id: authors[Math.floor(Math.random() * authors.length)].id,
+      },
     };
-    return createEntry({ model: "article", entry: article, files });
-  }));
+  }
+
+  return {
+    category: {
+      id: categories[Math.floor(Math.random() * categories.length)].id,
+    },
+    author: {
+      id: authors[Math.floor(Math.random() * authors.length)].id,
+    },
+  };
 }
+
+
+async function importArticles() {
+  const relations = await getArticleRelation();
+  
+  return Promise.all(
+    articles.map((article) => {
+      const files = {
+        image: getFileData(`${article.slug}.jpg`),
+      };
+
+      return createEntry({
+        model: "article",
+        entry: {
+          ...article,
+          ...relations,
+        },
+        files,
+      });
+    })
+  );
+}
+
+
+// async function importArticles() {
+//   return Promise.all(articles.map((article) => {
+//     const files = {
+//       image: getFileData(`${article.slug}.jpg`),
+//     };
+//     return createEntry({ model: "article", entry: article, files });
+//   }));
+// }
 
 async function importGlobal() {
   const files = {
@@ -170,22 +218,4 @@ module.exports = async () => {
       console.error(error);
     }
   }
-};
-
-module.exports = () => {
-  strapi.app.use(async (ctx, next) => {
-      try {
-          console.log("ctx inside config.functions.bootstrap.js", ctx.request.body)
-          // const strapiUserPermissions = await strapi.plugins['users-permissions'].services
-          // console.log("await strapi.plugins['users-permissions'].services", strapiUserPermissions)
-          await next();
-      } catch(err) {
-          console.log("err inside bootstrap is called", err.code);
-          if(err.code === 11000) {
-              ctx.badData(`Duplicate value for ${Object.keys(err.keyPattern)}`);
-          } else {
-              throw err;
-          }
-      }
-  });
 };
