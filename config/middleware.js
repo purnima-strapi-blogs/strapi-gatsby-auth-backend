@@ -1,18 +1,8 @@
-
-// module.exports = {
-//   settings: {
-//     cors: {
-//       enabled: true, 
-//       headers: '*', 
-//       origin: ['http://localhost:8000'],
-//     },
-//   },
-// };
-
 module.exports = {
   settings: {
+    enabled: true,
     cors: {
-      origin: ['http://localhost:8000'],
+      origin: ["http://localhost:8000", "http://localhost:1337"]
     },
   },
 };
