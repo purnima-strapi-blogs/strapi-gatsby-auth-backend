@@ -135,7 +135,7 @@ module.exports = {
         const token = strapi.plugins["users-permissions"].services.jwt.issue({
           id: user.id,
         });
-        
+
         ctx.cookies.set("token", token, {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production" ? true : false,
